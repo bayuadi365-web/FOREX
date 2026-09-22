@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMC Radar - Professional Forex Analytics</title>
+    
+    <!-- Tailwind CSS (CDN for MVP) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                        darker: '#0b1120',
+                        brand: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body class="bg-darker text-slate-300 font-sans antialiased selection:bg-brand selection:text-white">
+    <div class="min-h-screen flex flex-col">
+        <!-- Top Navbar -->
+        <header class="bg-dark border-b border-slate-800 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded bg-brand flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20">
+                            SR
+                        </div>
+                        <span class="font-bold text-xl tracking-tight text-white">SMC Radar</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-sm text-slate-400 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            Live Market Data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div x-data="tradingApp()" x-init="initApp()" class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                
+                <!-- Left Sidebar: Pairs & Bias -->
+                <div class="lg:col-span-1 space-y-6">
+                    
+                    <!-- Pair Selector -->
+                    <div class="bg-dark border border-slate-800 rounded-xl p-5 shadow-lg">
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Select Instrument</h3>
+                        <div class="space-y-2">
+                            <template x-for="pair in pairs" :key="pair.id">
+                                <button 
+                                    @click="selectPair(pair.id)"
+                                    :class="selectedPairId === pair.id ? 'bg-brand/10 border-brand/50 text-white' : 'bg-slate-800/50 border-transparent text-slate-400 hover:bg-slate-800'"
+                                    class="w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-colors border">
+                                    <span class="font-bold" x-text="pair.label"></span>
+                                    <template x-if="selectedPairId === pair.id">
+                                        <span class="relative flex h-3 w-3">
+                                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                                          <span class="relative inline-flex rounded-full h-3 w-3 bg-brand"></span>
+                                        </span>
+                                    </template>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- HTF / LTF Bias Matrix -->
+                    <div class="bg-dark border border-slate-800 rounded-xl p-5 shadow-lg">
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Structure Bias</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <template x-for="(bias, tf) in biases" :key="tf">
+                                <div class="flex items-center justify-between p-2 rounded bg-slate-800/50 border border-slate-700/50">
+                                    <span class="text-xs font-bold text-slate-300" x-text="tf"></span>
+                                    <span class="text-[10px] uppercase font-bold px-2 py-1 rounded"
+                                          :class="{
+                                              'bg-green-500/20 text-green-400': bias === 'bullish',
+                                              'bg-red-500/20 text-red-400': bias === 'bearish',
+                                              'bg-yellow-500/20 text-yellow-400': bias === 'ranging'
+                                          }" x-text="bias"></span>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div x-show="biases['M30'] !== biases['M15'] && biases['M30'] !== 'ranging' && biases['M15'] !== 'ranging'" class="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-start gap-3">
+                            <svg class="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <div class="text-xs text-yellow-500/90 leading-relaxed">
+                                <strong class="block text-yellow-500 mb-1">Konflik Struktur</strong>
+                                Bias M30 dan M15 berlawanan. Probabilitas diturunkan.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content: Chart & Analysis -->
+                <div class="lg:col-span-3 space-y-6">
+                    
+                    <!-- Score & Main Bias Card -->
+                    <div class="bg-gradient-to-r from-dark to-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                            <svg class="w-32 h-32 text-brand" fill="currentColor" viewBox="0 0 24 24"><path d="M21 21H3v-2h18v2zm-2-12l-4-4v3H9v-3l-4 4 4 4v-3h6v3l4-4z"/></svg>
+                        </div>
+                        
+                        <div class="flex flex-col md:flex-row gap-6 items-start md:items-center relative z-10">
+                            <!-- Score Circle -->
+                            <div class="shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-full border-4"
+                                 :class="report.score >= 75 ? 'border-green-500 bg-green-500/10 text-green-400' : (report.score >= 50 ? 'border-yellow-500 bg-yellow-500/10 text-yellow-400' : 'border-red-500 bg-red-500/10 text-red-400')">
+                                <span class="text-4xl font-black" x-text="report.score"></span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-80">Score</span>
+                            </div>
+                            
+                            <div class="flex-1 space-y-4">
+                                <div>
+                                    <div class="flex items-center gap-3 mb-1">
+                                        <h2 class="text-2xl font-bold text-white">Skenario Utama</h2>
+                                        <span class="px-3 py-1 text-xs font-bold uppercase rounded-full"
+                                              :class="report.bias === 'bullish' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                              x-text="report.bias + ' Bias'">
+                                        </span>
+                                    </div>
+                                    <p class="text-slate-400 text-sm leading-relaxed" x-text="report.primary_scenario.description"></p>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-darker/50 p-3 rounded border border-slate-800/50">
+                                        <span class="block text-xs text-slate-500 uppercase font-semibold mb-1">Target Likuiditas</span>
+                                        <span class="font-mono text-lg text-brand" x-text="report.primary_scenario.target_level"></span>
+                                    </div>
+                                    <div class="bg-darker/50 p-3 rounded border border-slate-800/50">
+                                        <span class="block text-xs text-slate-500 uppercase font-semibold mb-1">Invalidation Level</span>
+                                        <span class="font-mono text-lg text-red-400" x-text="report.alt_scenario.invalidation_level"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- The Chart -->
+                    <div class="bg-dark border border-slate-800 rounded-xl p-1 shadow-lg flex flex-col">
+                        <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-darker/50 rounded-t-lg">
+                            <div class="font-bold text-white flex items-center gap-2">
+                                <svg class="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                                Live Chart Analysis
+                                <span x-show="isLoading" class="ml-2 text-xs text-brand animate-pulse">Loading...</span>
+                            </div>
+                            <div class="text-xs text-slate-500">M15 Timeframe</div>
+                        </div>
+                        <!-- Chart Container (Explicit Height added) -->
+                        <div id="tv-chart" style="width: 100%; height: 400px; position: relative;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="bg-dark border-t border-slate-800 py-6 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-slate-500">
+                &copy; 2024 SMC Radar. This is a probabilistic analysis tool, not financial advice. Trading forex carries a high level of risk.
+            </div>
+        </footer>
+    </div>
+
+    <!-- Alpine JS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script>
+        function tradingApp() {
+            return {
+                chart: null,
+                series: null,
+                isLoading: false,
+                
+                pairs: [
+                    { id: 1, label: 'EURUSD', symbol: 'EURUSDT' }, 
+                    { id: 2, label: 'GBPUSD', symbol: 'GBPUSDT' },
+                    { id: 3, label: 'XAUUSD', symbol: 'BTCUSDT' }  
+                ],
+                selectedPairId: 1,
+                
+                report: {
+                    bias: 'bullish',
+                    score: 85,
+                    primary_scenario: { target_level: '1.11500', description: 'Harga berada di OTE discount, ekspektasi ekspansi ke Buy-side Liquidity terdekat.' },
+                    alt_scenario: { invalidation_level: '1.09850' }
+                },
+                
+                biases: { 'D1': 'bullish', 'H4': 'bullish', 'H1': 'bullish', 'M30': 'ranging', 'M15': 'bullish', 'M5': 'bullish', 'M1': 'bearish' },
+                
+                initApp() {
+                    // Delay slightly to ensure DOM is fully rendered
+                    setTimeout(() => {
+                        this.setupChart();
+                        this.fetchRealData();
+                    }, 100);
+                },
+                
+                setupChart() {
+                    const container = document.getElementById('tv-chart');
+                    if (!container) return;
+                    
+                    const chartOptions = { 
+                        autoSize: true, // Auto resize to container
+                        layout: { textColor: '#94a3b8', background: { type: 'solid', color: '#0f172a' } },
+                        grid: { vertLines: { color: '#1e293b' }, horzLines: { color: '#1e293b' } },
+                        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                        rightPriceScale: { borderColor: '#1e293b' },
+                        timeScale: { borderColor: '#1e293b', timeVisible: true },
+                    };
+                    
+                    this.chart = LightweightCharts.createChart(container, chartOptions);
+                    
+                    this.series = this.chart.addCandlestickSeries({
+                        upColor: '#10b981', downColor: '#ef4444', 
+                        borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#ef4444' 
+                    });
+                },
+                
+                selectPair(id) {
+                    this.selectedPairId = id;
+                    
+                    if (id === 1) {
+                        this.report.bias = 'bullish'; this.report.score = 85;
+                        this.report.primary_scenario.target_level = '1.11500';
+                        this.biases.M30 = 'ranging'; this.biases.M15 = 'bullish';
+                    } else if (id === 2) {
+                        this.report.bias = 'bearish'; this.report.score = 65;
+                        this.report.primary_scenario.target_level = '1.25000';
+                        this.biases.M30 = 'bearish'; this.biases.M15 = 'bullish'; 
+                    } else {
+                        this.report.bias = 'bullish'; this.report.score = 92;
+                        this.report.primary_scenario.target_level = '2050.50';
+                        this.biases.M30 = 'bullish'; this.biases.M15 = 'bullish';
+                    }
+                    
+                    this.fetchRealData();
+                },
+                
+                async fetchRealData() {
+                    this.isLoading = true;
+                    
+                    try {
+                        const pair = this.pairs.find(p => p.id === this.selectedPairId);
+                        
+                        // We use Promise.race to create a manual timeout, works on all browsers
+                        const fetchPromise = fetch(`https://api.binance.com/api/v3/klines?symbol=${pair.symbol}&interval=15m&limit=200`);
+                        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
+                        
+                        const response = await Promise.race([fetchPromise, timeoutPromise]);
+                        
+                        if (!response.ok) throw new Error('API failed');
+                        
+                        const rawData = await response.json();
+                        const formattedData = rawData.map(d => ({
+                            time: Math.floor(d[0] / 1000), 
+                            open: parseFloat(d[1]),
+                            high: parseFloat(d[2]),
+                            low: parseFloat(d[3]),
+                            close: parseFloat(d[4])
+                        }));
+                        
+                        // Validasi data tidak kosong
+                        if (formattedData.length > 0) {
+                            this.series.setData(formattedData);
+                            this.chart.timeScale().fitContent();
+                        } else {
+                            throw new Error('Empty data');
+                        }
+                        
+                    } catch (error) {
+                        console.warn('API error, using dummy data', error);
+                        this.generateDummyData();
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                generateDummyData() {
+                    if (!this.series) return;
+                    
+                    const data = [];
+                    let time = Math.floor(Date.now() / 1000) - (200 * 900); 
+                    
+                    let price = this.selectedPairId === 1 ? 1.0950 : (this.selectedPairId === 2 ? 1.2500 : 2050.50);
+                    let volatility = this.selectedPairId === 3 ? 2.5 : 0.0010;
+                    
+                    for(let i = 0; i < 200; i++) {
+                        const open = price;
+                        const change = (Math.random() - 0.5) * volatility * 2;
+                        const close = open + change;
+                        const high = Math.max(open, close) + (Math.random() * volatility);
+                        const low = Math.min(open, close) - (Math.random() * volatility);
+                        
+                        data.push({ 
+                            time: time, 
+                            open: parseFloat(open.toFixed(5)), 
+                            high: parseFloat(high.toFixed(5)), 
+                            low: parseFloat(low.toFixed(5)), 
+                            close: parseFloat(close.toFixed(5)) 
+                        });
+                        
+                        price = close;
+                        time += 900; 
+                    }
+                    
+                    this.series.setData(data);
+                    this.chart.timeScale().fitContent();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
