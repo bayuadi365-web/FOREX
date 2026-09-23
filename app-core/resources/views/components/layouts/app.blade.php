@@ -33,16 +33,28 @@
         <header class="bg-dark border-b border-slate-800 sticky top-0 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded bg-brand flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20">
-                            SR
+                    <div class="flex items-center justify-between w-full">
+                        <div class="flex items-center gap-8">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded bg-brand flex items-center justify-center font-bold text-white shadow-lg shadow-brand/20">
+                                    SR
+                                </div>
+                                <span class="font-bold text-xl tracking-tight text-white">SMC Radar</span>
+                            </div>
+                            
+                            <!-- Navigation Links -->
+                            <nav class="hidden md:flex gap-6">
+                                <a href="/" class="text-sm font-medium transition-colors hover:text-white {{ request()->is('/') ? 'text-brand' : 'text-slate-400' }}">Dashboard</a>
+                                <a href="/scalper" class="text-sm font-medium transition-colors hover:text-white {{ request()->is('scalper') ? 'text-brand' : 'text-slate-400' }}">Scalper Screener</a>
+                                <a href="/backtest" class="text-sm font-medium transition-colors hover:text-white {{ request()->is('backtest') ? 'text-brand' : 'text-slate-400' }}">Backtester</a>
+                            </nav>
                         </div>
-                        <span class="font-bold text-xl tracking-tight text-white">SMC Radar</span>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-sm text-slate-400 flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            Live Market Data
+                        
+                        <div class="flex items-center gap-4">
+                            <div class="text-sm text-slate-400 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                Live Market Data
+                            </div>
                         </div>
                     </div>
                 </div>

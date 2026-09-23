@@ -120,12 +120,8 @@ class TopDownAnalysisOrchestrator
 
     protected function buildPrimaryScenario(Pair $pair, string $bias, int $score): array
     {
-        // Ambil data riil dari candle terakhir untuk menentukan level target
-        $lastCandle = Candle::where('pair_id', $pair->id)
-            ->orderBy('open_time', 'desc')
-            ->first();
+        $lastCandle = Candle::where('pair_id', $pair->id)->orderBy('open_time', 'desc')->first();
         
-        // Ambil swing high terdekat sebagai target bullish
         $recentCandles = Candle::where('pair_id', $pair->id)
             ->where('timeframe', 'H1')
             ->orderBy('open_time', 'desc')
@@ -135,25 +131,45 @@ class TopDownAnalysisOrchestrator
         $currentPrice = $lastCandle ? $lastCandle->close : 0;
         $recentHigh = $recentCandles->max('high') ?? $currentPrice;
         $recentLow = $recentCandles->min('low') ?? $currentPrice;
+        $range = $recentHigh - $recentLow;
         
-        // Tentukan digit format berdasarkan pair
         $decimals = ($pair->pip_digit ?? 4) + 1;
         
         if ($bias === 'bullish') {
             $targetLevel = number_format($recentHigh, $decimals, '.', '');
-            $description = "Harga diperkirakan melanjutkan ekspansi bullish menuju swing high terdekat di {$targetLevel}.";
+            // Entry ideal untuk RR 1:2 adalah di 1/3 terbawah dari range (Discount Zone)
+            $otePrice = $recentLow + ($range / 3);
+            $otePriceFormatted = number_format($otePrice, $decimals, '.', '');
+            
+            $description = "Target Buy-side Liquidity di {$targetLevel}. ";
+            if ($currentPrice > $otePrice) {
+                $description .= "R:R saat ini < 1:2. Tunggu retracement turun ke area Discount (sekitar {$otePriceFormatted}) sebelum masuk BUY.";
+            } else {
+                $description .= "Harga saat ini di area Discount (R:R > 1:2). Peluang BUY yang ideal.";
+            }
+            
         } elseif ($bias === 'bearish') {
             $targetLevel = number_format($recentLow, $decimals, '.', '');
-            $description = "Harga diperkirakan melanjutkan tekanan bearish menuju swing low terdekat di {$targetLevel}.";
+            // Entry ideal untuk RR 1:2 adalah di 1/3 teratas dari range (Premium Zone)
+            $otePrice = $recentHigh - ($range / 3);
+            $otePriceFormatted = number_format($otePrice, $decimals, '.', '');
+            
+            $description = "Target Sell-side Liquidity di {$targetLevel}. ";
+            if ($currentPrice < $otePrice) {
+                $description .= "R:R saat ini < 1:2. Tunggu retracement naik ke area Premium (sekitar {$otePriceFormatted}) sebelum masuk SELL.";
+            } else {
+                $description .= "Harga saat ini di area Premium (R:R > 1:2). Peluang SELL yang ideal.";
+            }
+            
         } else {
             $targetLevel = number_format($currentPrice, $decimals, '.', '');
-            $description = "Struktur belum jelas. Harga saat ini di {$targetLevel}, menunggu konfirmasi BOS/CHoCH.";
+            $description = "Struktur belum jelas. Tunggu konfirmasi BOS/CHoCH.";
         }
         
         return [
             'description' => $description,
             'target_level' => $targetLevel,
-            'path' => 'Retracement ke Order Block lalu ekspansi.',
+            'path' => 'Menunggu Retracement ke OTE (Optimal Trade Entry) lalu ekspansi.',
             'probability_percentage' => $score
         ];
     }
